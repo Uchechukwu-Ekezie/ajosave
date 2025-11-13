@@ -1,6 +1,6 @@
-# Supabase Setup Guide for BaseSafe
+# Supabase Setup Guide for Ajosave
 
-This guide will help you set up your Supabase database for the BaseSafe application.
+This guide will help you set up your Supabase database for the Ajosave application.
 
 ## Step 1: Create a Supabase Project
 
@@ -8,7 +8,7 @@ This guide will help you set up your Supabase database for the BaseSafe applicat
 2. Sign up or log in to your account
 3. Click "New Project"
 4. Fill in the project details:
-   - **Name**: BaseSafe (or your preferred name)
+   - **Name**: Ajosave (or your preferred name)
    - **Database Password**: Create a strong password (save it securely)
    - **Region**: Choose the closest region to your users
    - **Pricing Plan**: Free tier is sufficient for development
