@@ -1,4 +1,4 @@
--- BaseSafe Database Schema
+-- Ajosave Database Schema
 -- Run this SQL in your Supabase SQL Editor
 
 -- Create pools table

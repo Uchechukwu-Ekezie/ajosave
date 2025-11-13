@@ -12,13 +12,13 @@ const projectId = "80ad617c75ff0a3e14ee2636f4bbfe56";
 
 // 2. Create metadata object
 const metadata = {
-  name: "BaseSafe",
+  name: "Ajosave",
   description: "Decentralized Community Savings Platform on Celo & Base",
   url:
     typeof window !== "undefined"
       ? window.location.origin
-      : "https://basesafe.app",
-  icons: ["https://basesafe.app/icon.png"],
+      : "https://ajosave.app",
+  icons: ["https://ajosave.app/icon.png"],
 };
 
 // 3. Define Celo Sepolia Testnet
