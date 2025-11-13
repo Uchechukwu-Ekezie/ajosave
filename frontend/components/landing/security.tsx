@@ -1,29 +1,53 @@
 "use client"
 
 import { Card } from "@/components/ui/card"
-import { Shield, Lock, Eye, FileCheck } from "lucide-react"
+import { Shield, Lock, Eye, FileCheck, Cpu, FileSearch, Landmark } from "lucide-react"
 import { motion } from "framer-motion"
 
 const securityFeatures = [
   {
     icon: Shield,
+    badge: "Audited",
     title: "Smart Contract Security",
-    description: "All funds are held in audited smart contracts on Base blockchain.",
+    description:
+      "Funds are locked in open-source Solidity contracts derived from OpenZeppelin and verified on Sourcify.",
   },
   {
     icon: Lock,
+    badge: "Non-custodial",
     title: "Non-Custodial",
-    description: "You maintain full control of your funds. We never hold your assets.",
+    description: "You maintain full control of your funds. No treasurer wallets. Contracts enforce the rules.",
   },
   {
     icon: Eye,
+    badge: "Transparent",
     title: "Full Transparency",
-    description: "Every transaction is recorded on-chain and publicly verifiable.",
+    description: "Track every deposit and payout on CeloScan or BaseScan. We mirror data in Supabase for dashboards.",
   },
   {
     icon: FileCheck,
+    badge: "Reputation",
     title: "Reputation System",
-    description: "Build your on-chain savings history for future opportunities.",
+    description: "Every completed rotation builds verifiable savings history for future credit opportunities.",
+  },
+  {
+    icon: Cpu,
+    badge: "Automation",
+    title: "Safe Automation",
+    description: "Anvil-tested scripts deploy with via-ir for minimized bytecode. All jobs run through Foundry scripts.",
+  },
+  {
+    icon: FileSearch,
+    badge: "Monitoring",
+    title: "Activity Logs",
+    description:
+      "Supabase activity feed and email hooks provide off-chain monitoring so circles see who’s on time or late.",
+  },
+  {
+    icon: Landmark,
+    badge: "Treasury",
+    title: "Multi-chain Treasury",
+    description: "Fees flow into a dedicated treasury (0xa91D…338ef) ready for DAO governance or multi-sig controls.",
   },
 ]
 
@@ -51,13 +75,13 @@ export function Security() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="max-w-2xl mx-auto text-center mb-16"
+          className="mx-auto mb-16 max-w-3xl text-center"
         >
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-balance">
+          <h2 className="text-3xl font-bold sm:text-4xl lg:text-5xl">
             Built with <span className="text-primary">security</span> in mind
           </h2>
-          <p className="text-lg text-muted-foreground text-pretty">
-            Your funds are protected by blockchain technology and smart contracts
+          <p className="mt-4 text-lg text-muted-foreground">
+            On-chain enforcement + off-chain monitoring gives communities complete peace of mind.
           </p>
         </motion.div>
 
@@ -66,16 +90,21 @@ export function Security() {
           initial="hidden"
           whileInView="show"
           viewport={{ once: true }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8"
+          className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8"
         >
           {securityFeatures.map((feature, index) => (
             <motion.div key={index} variants={item}>
-              <Card className="p-6 h-full text-center hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 border-border/50">
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 mx-auto mb-4">
-                  <feature.icon className="h-7 w-7 text-primary" />
+              <Card className="h-full border-border/50 bg-background/80 p-7 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <feature.icon className="h-7 w-7" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground text-pretty">{feature.description}</p>
+                {feature.badge ? (
+                  <span className="mt-4 inline-flex items-center rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {feature.badge}
+                  </span>
+                ) : null}
+                <h3 className="mt-3 text-lg font-semibold text-foreground">{feature.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{feature.description}</p>
               </Card>
             </motion.div>
           ))}
