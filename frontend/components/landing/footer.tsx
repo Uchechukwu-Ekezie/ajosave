@@ -11,7 +11,7 @@ export function Footer() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
                 <Coins className="h-6 w-6 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold">Ajo</span>
+              <span className="text-xl font-bold">AjoSave</span>
             </Link>
             <p className="text-muted-foreground max-w-md text-pretty">
               Bringing traditional African savings circles on-chain. Save together, grow together.
@@ -74,7 +74,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-border/40 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">© 2025 Ajo. Built on Base blockchain.</p>
+          <p className="text-sm text-muted-foreground">© 2025 AjoSave. Built on Base blockchain.</p>
           <div className="flex gap-6 text-sm text-muted-foreground">
             <Link href="#" className="hover:text-foreground transition-colors">
               Privacy Policy

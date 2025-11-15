@@ -122,7 +122,15 @@ export function RotationalForm() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to save pool")
+        const errorData = await response.json().catch(() => ({}))
+        // If Supabase isn't configured, still allow the pool to be created on-chain
+        if (response.status === 503 && errorData.error?.includes("Supabase")) {
+          // Pool was created on-chain, just skip database save
+          setIsSavingToDB(false)
+          router.push("/dashboard")
+          return
+        }
+        throw new Error(errorData.error || "Failed to save pool")
       }
 
       const pool = await response.json()
@@ -132,8 +140,15 @@ export function RotationalForm() {
         router.push(`/dashboard/group/${pool.id}`)
       }, 1000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save pool")
-      setIsSavingToDB(false)
+      const errorMessage = err instanceof Error ? err.message : "Failed to save pool"
+      // Only show error if it's not a Supabase config issue
+      if (!errorMessage.includes("Supabase") && !errorMessage.includes("503")) {
+        setError(errorMessage)
+      } else {
+        // Pool was created on-chain, just redirect
+        setIsSavingToDB(false)
+        router.push("/dashboard")
+      }
     }
   }
 
