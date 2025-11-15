@@ -65,13 +65,24 @@ export function MyGroups({ onCreateClick }: MyGroupsProps) {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to fetch pools");
+        const errorData = await response.json().catch(() => ({}));
+        // Check if it's a Supabase configuration error
+        if (response.status === 503 && errorData.error?.includes("Supabase")) {
+          setError("Database not configured. Pools will be saved on-chain only.");
+          setPools([]);
+          return;
+        }
+        throw new Error(errorData.error || "Failed to fetch pools");
       }
 
       const data = await response.json();
       setPools(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch pools");
+      // Don't show error if it's just Supabase not configured
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch pools";
+      if (!errorMessage.includes("Supabase") && !errorMessage.includes("503")) {
+        setError(errorMessage);
+      }
       setPools([]);
     } finally {
       setLoading(false);
@@ -105,7 +116,7 @@ export function MyGroups({ onCreateClick }: MyGroupsProps) {
     );
   }
 
-  if (error) {
+  if (error && !error.includes("Database not configured")) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -157,6 +168,11 @@ export function MyGroups({ onCreateClick }: MyGroupsProps) {
                 Create your first savings group or join an existing one to get
                 started
               </p>
+              {error && error.includes("Database not configured") && (
+                <div className="mb-4 p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                  Note: Database not configured. Groups are saved on-chain only.
+                </div>
+              )}
               <Button
                 className="bg-primary hover:bg-primary/90"
                 onClick={onCreateClick}

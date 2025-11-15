@@ -18,9 +18,12 @@ if (isPlaceholder || !isValidUrl || !hasValidKey) {
   }
 }
 
+// Export a flag to check if Supabase is properly configured
+export const isSupabaseConfigured = isValidUrl && hasValidKey
+
 // Only create client if we have valid credentials, otherwise use a safe dummy client
 // Using a valid Supabase URL format to avoid validation errors
-export const supabase = isValidUrl && hasValidKey
+export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : createClient(
       'https://xxxxxxxxxxxxxxxxxxxx.supabase.co',
@@ -189,6 +192,14 @@ export async function savePoolToDatabase({
   withdrawalFee?: string
   yieldEnabled?: boolean
 }) {
+  // Early return if Supabase is not configured
+  if (!isSupabaseConfigured) {
+    return {
+      success: false,
+      error: 'Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.',
+    }
+  }
+
   try {
     // Insert pool
     const { data: pool, error: poolError } = await supabase
@@ -215,7 +226,13 @@ export async function savePoolToDatabase({
       ])
       .select()
 
-    if (poolError) throw poolError
+    if (poolError) {
+      // Check if it's a table not found error
+      if (poolError.code === 'PGRST205' || (poolError.message && poolError.message.includes("Could not find the table"))) {
+        throw new Error('Database tables not found. Please run the SQL schema to create the required tables.')
+      }
+      throw poolError
+    }
     if (!pool || pool.length === 0) throw new Error('Failed to create pool')
 
     const poolId = pool[0].id
@@ -248,10 +265,32 @@ export async function savePoolToDatabase({
 
     return { success: true, poolId, pool: pool[0] }
   } catch (error) {
-    console.error('Failed to save pool:', error)
+    // Check if it's a table not found error
+    const errorObj = error as any
+    if (errorObj?.code === 'PGRST205' || (error instanceof Error && error.message.includes("Could not find the table"))) {
+      return {
+        success: false,
+        error: 'Database tables not found. Please run the SQL schema to create the required tables. See frontend/supabase_schema.sql',
+      }
+    }
+    
+    // Check if it's a fetch/connection error
+    if (error instanceof Error && (error.message.includes('fetch failed') || error.message.includes('ECONNREFUSED'))) {
+      return {
+        success: false,
+        error: 'Unable to connect to Supabase. Please check your NEXT_PUBLIC_SUPABASE_URL and ensure Supabase is running.',
+      }
+    }
+    
+    // Only log non-connection/schema errors
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (!errorMsg.includes('Supabase') && !errorMsg.includes('Database tables')) {
+      console.error('Failed to save pool:', error)
+    }
+    
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMsg,
     }
   }
 }

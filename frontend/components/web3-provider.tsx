@@ -142,7 +142,7 @@ createAppKit({
   projectId,
   metadata,
   features: {
-    analytics: true,
+    analytics: false, // Disabled to prevent analytics errors
   },
   themeMode: "dark",
   themeVariables: {
