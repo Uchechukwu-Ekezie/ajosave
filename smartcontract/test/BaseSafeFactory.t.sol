@@ -116,5 +116,47 @@ contract BaseSafeFactoryTest is Test {
         assertEq(factory.allTarget().length, 2);
         assertTrue(pool1 != pool2);
     }
+
+    function test_CreateFlexible() public {
+        address[] memory members = new address[](2);
+        members[0] = user1;
+        members[1] = user2;
+        
+        uint256 minimumDeposit = 10e18;
+        uint256 withdrawalFeeBps = 50; // 0.5%
+        bool yieldEnabled = true;
+        uint256 treasuryFeeBps = 100; // 1%
+        
+        vm.expectEmit(true, true, false, false);
+        emit BaseSafeFactory.FlexibleCreated(address(0), user1);
+        
+        vm.prank(user1);
+        address pool = factory.createFlexible(
+            members,
+            minimumDeposit,
+            withdrawalFeeBps,
+            yieldEnabled,
+            treasuryFeeBps
+        );
+        
+        assertTrue(pool != address(0));
+        assertEq(factory.allFlexible().length, 1);
+        assertEq(factory.allFlexible()[0], pool);
+    }
+
+    function test_CreateFlexibleMultiple() public {
+        address[] memory members = new address[](2);
+        members[0] = user1;
+        members[1] = user2;
+        
+        vm.prank(user1);
+        address pool1 = factory.createFlexible(members, 10e18, 50, true, 100);
+        
+        vm.prank(user2);
+        address pool2 = factory.createFlexible(members, 20e18, 100, false, 100);
+        
+        assertEq(factory.allFlexible().length, 2);
+        assertTrue(pool1 != pool2);
+    }
 }
 
