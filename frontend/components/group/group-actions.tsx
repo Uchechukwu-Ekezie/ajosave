@@ -144,6 +144,9 @@ export function GroupActions({
 
   // Handle deposit success - log to database and refresh
   useEffect(() => {
+    // Convert contractDepositAmount to string for stable dependency
+    const contractDepositAmountStr = contractDepositAmount ? String(contractDepositAmount) : undefined
+    
     const logDepositActivity = async (txHash: string, amount: string, activityType: string) => {
       if (!txHash) {
         console.error('No transaction hash provided for activity logging')
@@ -189,7 +192,7 @@ export function GroupActions({
       const txHash = rotationalDeposit.hash
       if (!loggedTransactions.current.has(txHash)) {
         loggedTransactions.current.add(txHash)
-        const amount = contractDepositAmount ? (Number(contractDepositAmount) / 1e18).toString() : depositAmount
+        const amount = contractDepositAmount ? (Number(contractDepositAmount) / 1e18).toString() : depositAmount || "0"
         setSuccess(`Deposit successful! Transaction: ${txHash.slice(0, 10)}...`)
         logDepositActivity(txHash, amount, 'deposit')
         setDepositAmount("")
@@ -208,7 +211,7 @@ export function GroupActions({
       if (!loggedTransactions.current.has(txHash)) {
         loggedTransactions.current.add(txHash)
         setSuccess(`Contribution successful! Transaction: ${txHash.slice(0, 10)}...`)
-        logDepositActivity(txHash, depositAmount, 'contribute')
+        logDepositActivity(txHash, depositAmount || "0", 'contribute')
         setDepositAmount("")
         setApproved(false)
         setError("")
@@ -224,7 +227,7 @@ export function GroupActions({
       if (!loggedTransactions.current.has(txHash)) {
         loggedTransactions.current.add(txHash)
         setSuccess(`Deposit successful! Transaction: ${txHash.slice(0, 10)}...`)
-        logDepositActivity(txHash, depositAmount, 'deposit')
+        logDepositActivity(txHash, depositAmount || "0", 'deposit')
         setDepositAmount("")
         setApproved(false)
         setError("")
@@ -235,7 +238,19 @@ export function GroupActions({
         }, 3000)
       }
     }
-  }, [rotationalDeposit.isSuccess, rotationalDeposit.hash, targetContribute.isSuccess, targetContribute.hash, flexibleDeposit.isSuccess, flexibleDeposit.hash, groupId, address, poolAddress, contractDepositAmount, depositAmount])
+  }, [
+    rotationalDeposit.isSuccess, 
+    rotationalDeposit.hash, 
+    targetContribute.isSuccess, 
+    targetContribute.hash, 
+    flexibleDeposit.isSuccess, 
+    flexibleDeposit.hash, 
+    groupId, 
+    address || undefined, 
+    poolAddress || undefined, 
+    contractDepositAmount ? String(contractDepositAmount) : undefined, 
+    depositAmount || undefined
+  ])
 
   // Handle mint success
   useEffect(() => {
