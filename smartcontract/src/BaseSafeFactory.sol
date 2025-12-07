@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /* ========== ROTATIONAL POOL ========== */
-contract BaseSafeRotational is Ownable(msg.sender) {
+contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
     address[] public members;
     mapping(address => bool) public hasDeposited;
     uint256 public totalMembers;
