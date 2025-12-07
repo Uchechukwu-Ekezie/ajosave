@@ -192,7 +192,7 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         active = true;
     }
 
-    function contribute(uint256 amount) external {
+    function contribute(uint256 amount) external nonReentrant {
         require(active, "pool inactive");
         require(isMember(msg.sender), "not member");
         require(block.timestamp <= deadline, "deadline passed");
@@ -212,7 +212,7 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         }
     }
 
-    function withdraw() external {
+    function withdraw() external nonReentrant {
         require(completed || block.timestamp > deadline, "not ready");
         require(contributions[msg.sender] > 0, "no contribution");
 
@@ -229,7 +229,7 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         emit Withdrawal(msg.sender, userShare);
     }
 
-    function treasuryWithdraw() external onlyOwner {
+    function treasuryWithdraw() external onlyOwner nonReentrant {
         require(completed || block.timestamp > deadline, "not ready");
 
         uint256 totalFees = (totalContributed * treasuryFeeBps) / BPS;
