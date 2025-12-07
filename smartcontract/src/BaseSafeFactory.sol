@@ -296,7 +296,7 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         active = true;
     }
 
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount) external nonReentrant {
         require(active, "pool inactive");
         require(isMember(msg.sender), "not member");
         require(amount >= minimumDeposit, "below minimum");
@@ -310,7 +310,7 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         emit Deposited(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external nonReentrant {
         require(amount > 0, "amount 0");
         require(balances[msg.sender] >= amount, "insufficient balance");
 
@@ -331,7 +331,7 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         emit Withdrawn(msg.sender, netAmount, fee);
     }
 
-    function distributeYield(uint256 yieldAmount) external onlyOwner {
+    function distributeYield(uint256 yieldAmount) external onlyOwner nonReentrant {
         require(yieldEnabled, "yield disabled");
         require(yieldAmount > 0, "yield 0");
         require(totalBalance > 0, "no balance");
