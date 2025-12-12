@@ -5,6 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+/**
+ * @title BaseSafeRotational
+ * @author AjoSave
+ * @notice Implements a rotational savings pool where members take turns receiving payouts
+ * @dev This contract manages a traditional ROSCA (Rotating Savings and Credit Association)
+ *      where members deposit fixed amounts each round, and one member receives the collected
+ *      funds in rotation. Includes penalty mechanisms for late deposits and automated payout
+ *      scheduling. Protected by ReentrancyGuard to prevent reentrancy attacks.
+ */
 /* ========== ROTATIONAL POOL ========== */
 contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
     address[] public members;
@@ -20,13 +29,38 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
     bool public active;
     IERC20 public immutable token;
 
+    /// @notice Emitted when a member deposits their contribution for the current round
     event Deposit(address indexed user, uint256 amount);
+    
+    /// @notice Emitted when a payout is made to the beneficiary for the current round
+    /// @param beneficiary The member receiving the payout
+    /// @param amount The net payout amount after fees
+    /// @param treasuryCut The fee amount sent to treasury
+    /// @param relayerCut The fee amount sent to the relayer who triggered the payout
     event Payout(address indexed beneficiary, uint256 amount, uint256 treasuryCut, uint256 relayerCut);
+    
+    /// @notice Emitted when a penalty is applied to a member who failed to deposit on time
     event Slashed(address indexed offender, uint256 penalty);
+    
+    /// @notice Emitted when all rounds are completed and the pool becomes inactive
     event PoolCompleted();
 
+    /// @notice Basis points constant (10000 = 100%)
     uint256 private constant BPS = 10000;
 
+    /**
+     * @notice Initializes a new rotational savings pool
+     * @dev Sets up the pool with members, deposit requirements, and fee structure.
+     *      The pool becomes active immediately and the first round starts.
+     * @param _token The ERC20 token address to be used for deposits and payouts
+     * @param _members Array of member addresses who can participate in the pool
+     * @param _depositAmount Fixed amount each member must deposit per round (in token units)
+     * @param _roundDuration Duration of each round in seconds (time between payouts)
+     * @param _treasuryFeeBps Treasury fee in basis points (e.g., 100 = 1%)
+     * @param _relayerFeeBps Relayer fee in basis points for triggering payouts
+     * @param _treasury Address that receives treasury fees
+     * @custom:security Requires at least 2 members, non-zero amounts, and valid addresses
+     */
     constructor(
         address _token,
         address[] memory _members,
@@ -56,6 +90,13 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         active = true;
     }
 
+    /**
+     * @notice Allows a member to deposit their contribution for the current round
+     * @dev Member must approve the contract to spend tokens before calling this function.
+     *      Each member can only deposit once per round. Protected by ReentrancyGuard.
+     * @custom:security Requires pool to be active, caller to be a member, and not already deposited
+     * @custom:security Uses nonReentrant modifier to prevent reentrancy attacks
+     */
     function deposit() external nonReentrant {
         require(active, "pool inactive");
         require(isMember(msg.sender), "not member");
