@@ -11,6 +11,20 @@ on:
     paths:
       - 'smartcontract/**'
       - '.github/workflows/test.yml'
+  workflow_dispatch:
+    inputs:
+      contract_address:
+        description: 'Contract address to verify'
+        required: false
+        type: string
+      contract_name:
+        description: 'Contract name (e.g., BaseSafeFactory)'
+        required: false
+        type: string
+      constructor_args:
+        description: 'Constructor arguments (hex encoded)'
+        required: false
+        type: string
 
 jobs:
   test:
@@ -55,4 +69,69 @@ jobs:
       - name: Run tests with verbose output
         if: failure()
         run: forge test -vvv
+
+  verify:
+    name: Verify Contract
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.contract_address != ''
+    
+    defaults:
+      run:
+        working-directory: ./smartcontract
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install dependencies
+        run: forge install --no-commit
+
+      - name: Build contracts
+        run: forge build
+
+      - name: Verify contract on Sourcify
+        env:
+          CONTRACT_ADDRESS: ${{ github.event.inputs.contract_address }}
+          CONTRACT_NAME: ${{ github.event.inputs.contract_name }}
+          CONSTRUCTOR_ARGS: ${{ github.event.inputs.constructor_args }}
+        run: |
+          if [ -z "$CONTRACT_NAME" ]; then
+            echo "Error: Contract name is required"
+            exit 1
+          fi
+          
+          echo "Verifying contract: $CONTRACT_NAME at $CONTRACT_ADDRESS"
+          
+          # Verify on Sourcify (supports multiple chains)
+          if [ -z "$CONSTRUCTOR_ARGS" ]; then
+            forge verify-contract \
+              "$CONTRACT_ADDRESS" \
+              "$CONTRACT_NAME" \
+              --verifier sourcify \
+              --verifier-url https://sourcify.dev/server \
+              --chain-id ${{ github.event.inputs.chain_id || '84532' }}
+          else
+            forge verify-contract \
+              "$CONTRACT_ADDRESS" \
+              "$CONTRACT_NAME" \
+              --constructor-args "$CONSTRUCTOR_ARGS" \
+              --verifier sourcify \
+              --verifier-url https://sourcify.dev/server \
+              --chain-id ${{ github.event.inputs.chain_id || '84532' }}
+          fi
+
+      - name: Verification summary
+        if: always()
+        run: |
+          echo "## Contract Verification" >> $GITHUB_STEP_SUMMARY
+          echo "- Contract: ${{ github.event.inputs.contract_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Address: ${{ github.event.inputs.contract_address }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
 
