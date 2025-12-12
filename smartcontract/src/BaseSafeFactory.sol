@@ -109,6 +109,16 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         emit Deposit(msg.sender, depositAmount);
     }
 
+    /**
+     * @notice Triggers the payout for the current round to the designated beneficiary
+     * @dev This function can be called by anyone once the round duration has elapsed.
+     *      It handles penalty collection for non-depositing members, calculates fees,
+     *      distributes the payout to the beneficiary, and advances to the next round.
+     *      The caller receives the relayer fee as an incentive to trigger payouts.
+     * @custom:security Protected by ReentrancyGuard. Penalties are collected via try-catch
+     *                  to handle cases where members don't have sufficient token allowance.
+     * @custom:security Relayer fee is paid to msg.sender - verify caller identity in production
+     */
     function triggerPayout() external nonReentrant {
         require(active, "pool inactive");
         require(block.timestamp >= nextPayoutTime, "too early");
