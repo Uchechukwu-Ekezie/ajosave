@@ -208,6 +208,15 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
     }
 }
 
+/**
+ * @title BaseSafeTarget
+ * @author AjoSave
+ * @notice Implements a target-based savings pool where members contribute towards a collective goal
+ * @dev Members can contribute any amount until the target is reached or deadline passes.
+ *      Once the target is met or deadline expires, members can withdraw their proportional share
+ *      minus treasury fees. This contract does not use ReentrancyGuard but should be reviewed
+ *      if external calls are added in the future.
+ */
 /* ========== TARGET POOL ========== */
 contract BaseSafeTarget is Ownable(msg.sender) {
     address[] public members;
@@ -222,12 +231,30 @@ contract BaseSafeTarget is Ownable(msg.sender) {
     uint256 public treasuryFeeBps;
     IERC20 public immutable token;
 
+    /// @notice Emitted when a member contributes to the pool
     event Contributed(address indexed user, uint256 amount);
+    
+    /// @notice Emitted when the target amount is reached
     event TargetReached();
+    
+    /// @notice Emitted when a member withdraws their share
     event Withdrawal(address indexed user, uint256 amount);
 
+    /// @notice Basis points constant (10000 = 100%)
     uint256 private constant BPS = 10000;
 
+    /**
+     * @notice Initializes a new target-based savings pool
+     * @dev Sets up the pool with members, target amount, deadline, and fee structure.
+     *      The pool becomes active immediately and accepts contributions until target or deadline.
+     * @param _token The ERC20 token address to be used for contributions and withdrawals
+     * @param _members Array of member addresses who can contribute to the pool
+     * @param _targetAmount The total amount the pool aims to collect (in token units)
+     * @param _deadline Unix timestamp after which contributions are no longer accepted
+     * @param _treasuryFeeBps Treasury fee in basis points (e.g., 100 = 1%)
+     * @param _treasury Address that receives treasury fees
+     * @custom:security Requires at least 2 members, non-zero target, future deadline, and valid addresses
+     */
     constructor(
         address _token,
         address[] memory _members,
