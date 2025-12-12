@@ -547,6 +547,14 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
     }
 }
 
+/**
+ * @title BaseSafeFactory
+ * @author AjoSave
+ * @notice Factory contract for creating and managing different types of savings pools
+ * @dev This factory creates instances of BaseSafeRotational, BaseSafeTarget, and BaseSafeFlexible pools.
+ *      Maintains lists of all created pools and allows the owner to update the treasury address.
+ *      All created pools use the same token and treasury address configured in the factory.
+ */
 /* ========== FACTORY ========== */
 contract BaseSafeFactory {
     address public immutable token;
@@ -556,10 +564,23 @@ contract BaseSafeFactory {
     address[] public allFlexible;
     address public owner;
 
+    /// @notice Emitted when a new rotational pool is created
     event RotationalCreated(address indexed pool, address indexed creator);
+    
+    /// @notice Emitted when a new target pool is created
     event TargetCreated(address indexed pool, address indexed creator);
+    
+    /// @notice Emitted when a new flexible pool is created
     event FlexibleCreated(address indexed pool, address indexed creator);
 
+    /**
+     * @notice Initializes the factory with the token and treasury addresses
+     * @dev The deployer becomes the owner and can update the treasury address.
+     *      All pools created by this factory will use the specified token and treasury.
+     * @param _token The ERC20 token address to be used by all created pools
+     * @param _treasury The treasury address that will receive fees from all pools
+     * @custom:security Requires non-zero token and treasury addresses
+     */
     constructor(address _token, address _treasury) {
         require(_token != address(0), "token 0");
         require(_treasury != address(0), "treasury 0");
@@ -568,11 +589,27 @@ contract BaseSafeFactory {
         owner = msg.sender;
     }
 
+    /**
+     * @notice Restricts function access to the factory owner only
+     * @dev Reverts if called by any address other than the owner
+     */
     modifier onlyOwner() {
         require(msg.sender == owner, "only owner");
         _;
     }
 
+    /**
+     * @notice Creates a new rotational savings pool
+     * @dev Deploys a new BaseSafeRotational contract with the specified parameters.
+     *      Ownership of the pool is transferred to the caller. The pool is added to the
+     *      allRotational array for tracking.
+     * @param members Array of member addresses who can participate in the pool
+     * @param depositAmount Fixed amount each member must deposit per round
+     * @param roundDuration Duration of each round in seconds
+     * @param treasuryFeeBps Treasury fee in basis points
+     * @param relayerFeeBps Relayer fee in basis points for triggering payouts
+     * @return The address of the newly created rotational pool
+     */
     function createRotational(
         address[] calldata members,
         uint256 depositAmount,
