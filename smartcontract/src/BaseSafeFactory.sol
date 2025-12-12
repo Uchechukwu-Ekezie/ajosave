@@ -517,6 +517,11 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         emit YieldDistributed(yieldAmount);
     }
 
+    /**
+     * @notice Checks if an address is a member of this flexible pool
+     * @param who The address to check for membership
+     * @return bool True if the address is a member, false otherwise
+     */
     function isMember(address who) public view returns (bool) {
         for (uint256 i = 0; i < totalMembers; i++) {
             if (members[i] == who) return true;
@@ -524,10 +529,19 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         return false;
     }
 
+    /**
+     * @notice Returns the complete list of member addresses in this flexible pool
+     * @return Array of all member addresses in the pool
+     */
     function membersList() external view returns (address[] memory) {
         return members;
     }
 
+    /**
+     * @notice Returns the current balance of a specific member in the pool
+     * @param user The address of the member to query
+     * @return The member's current balance in the pool
+     */
     function getBalance(address user) external view returns (uint256) {
         return balances[user];
     }
