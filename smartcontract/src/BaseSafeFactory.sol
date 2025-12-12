@@ -626,6 +626,17 @@ contract BaseSafeFactory {
         return address(pool);
     }
 
+    /**
+     * @notice Creates a new target-based savings pool
+     * @dev Deploys a new BaseSafeTarget contract with the specified parameters.
+     *      Ownership of the pool is transferred to the caller. The pool is added to the
+     *      allTarget array for tracking.
+     * @param members Array of member addresses who can contribute to the pool
+     * @param targetAmount The total amount the pool aims to collect
+     * @param deadline Unix timestamp after which contributions are no longer accepted
+     * @param treasuryFeeBps Treasury fee in basis points
+     * @return The address of the newly created target pool
+     */
     function createTarget(address[] calldata members, uint256 targetAmount, uint256 deadline, uint256 treasuryFeeBps)
         external
         returns (address)
@@ -637,6 +648,18 @@ contract BaseSafeFactory {
         return address(pool);
     }
 
+    /**
+     * @notice Creates a new flexible savings pool
+     * @dev Deploys a new BaseSafeFlexible contract with the specified parameters.
+     *      Ownership of the pool is transferred to the caller. The pool is added to the
+     *      allFlexible array for tracking.
+     * @param members Array of member addresses who can participate in the pool
+     * @param minimumDeposit Minimum amount required for each deposit
+     * @param withdrawalFeeBps Withdrawal fee in basis points
+     * @param yieldEnabled Whether yield distribution is enabled for this pool
+     * @param treasuryFeeBps Treasury fee in basis points (for yield distribution if applicable)
+     * @return The address of the newly created flexible pool
+     */
     function createFlexible(
         address[] calldata members,
         uint256 minimumDeposit,
@@ -653,6 +676,14 @@ contract BaseSafeFactory {
         return address(pool);
     }
 
+    /**
+     * @notice Updates the treasury address for all future pool creations
+     * @dev Only callable by the factory owner. This does not affect existing pools,
+     *      only pools created after this update will use the new treasury address.
+     * @param _treasury The new treasury address (must not be zero address)
+     * @custom:security Only callable by owner. Verify the new treasury address before calling.
+     *                  Consider using a multisig wallet for enhanced security.
+     */
     function setTreasury(address _treasury) external onlyOwner {
         require(_treasury != address(0), "treasury 0");
         treasury = _treasury;
