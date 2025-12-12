@@ -279,6 +279,14 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         active = true;
     }
 
+    /**
+     * @notice Allows a member to contribute tokens to the pool
+     * @dev Member must approve the contract to spend tokens before calling this function.
+     *      Contributions are tracked per member and added to the total. If the target is reached,
+     *      the pool is marked as completed. Protected by nonReentrant modifier.
+     * @param amount The amount of tokens to contribute (must be greater than 0)
+     * @custom:security Requires pool to be active, caller to be a member, deadline not passed, and positive amount
+     */
     function contribute(uint256 amount) external nonReentrant {
         require(active, "pool inactive");
         require(isMember(msg.sender), "not member");
@@ -299,6 +307,13 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         }
     }
 
+    /**
+     * @notice Allows a member to withdraw their proportional share from the pool
+     * @dev Can only be called after target is reached or deadline has passed.
+     *      Withdrawal amount is calculated based on the member's contribution share
+     *      minus proportional treasury fees. Protected by nonReentrant modifier.
+     * @custom:security Requires pool to be completed or deadline passed, and member to have contributed
+     */
     function withdraw() external nonReentrant {
         require(completed || block.timestamp > deadline, "not ready");
         require(contributions[msg.sender] > 0, "no contribution");
@@ -316,6 +331,13 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         emit Withdrawal(msg.sender, userShare);
     }
 
+    /**
+     * @notice Allows the owner to withdraw accumulated treasury fees
+     * @dev Can only be called after target is reached or deadline has passed.
+     *      Calculates total fees based on total contributions and transfers to treasury.
+     *      Protected by onlyOwner and nonReentrant modifiers.
+     * @custom:security Only callable by contract owner. Requires pool to be completed or deadline passed
+     */
     function treasuryWithdraw() external onlyOwner nonReentrant {
         require(completed || block.timestamp > deadline, "not ready");
 
