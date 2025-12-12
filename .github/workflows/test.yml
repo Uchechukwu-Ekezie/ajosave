@@ -25,6 +25,11 @@ on:
         description: 'Constructor arguments (hex encoded)'
         required: false
         type: string
+      chain_id:
+        description: 'Chain ID (e.g., 84532 for Base Sepolia, 11142220 for Celo Sepolia)'
+        required: false
+        type: string
+        default: '84532'
 
 jobs:
   test:
@@ -116,7 +121,7 @@ jobs:
               "$CONTRACT_NAME" \
               --verifier sourcify \
               --verifier-url https://sourcify.dev/server \
-              --chain-id ${{ github.event.inputs.chain_id || '84532' }}
+              --chain-id ${{ github.event.inputs.chain_id }}
           else
             forge verify-contract \
               "$CONTRACT_ADDRESS" \
@@ -124,7 +129,7 @@ jobs:
               --constructor-args "$CONSTRUCTOR_ARGS" \
               --verifier sourcify \
               --verifier-url https://sourcify.dev/server \
-              --chain-id ${{ github.event.inputs.chain_id || '84532' }}
+              --chain-id ${{ github.event.inputs.chain_id }}
           fi
 
       - name: Verification summary
