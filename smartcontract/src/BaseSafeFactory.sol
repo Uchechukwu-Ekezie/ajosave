@@ -187,6 +187,11 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         }
     }
 
+    /**
+     * @notice Checks if an address is a member of this rotational pool
+     * @param who The address to check for membership
+     * @return bool True if the address is a member, false otherwise
+     */
     function isMember(address who) public view returns (bool) {
         for (uint256 i = 0; i < totalMembers; i++) {
             if (members[i] == who) return true;
@@ -194,6 +199,10 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         return false;
     }
 
+    /**
+     * @notice Returns the complete list of member addresses in this rotational pool
+     * @return Array of all member addresses in the pool
+     */
     function membersList() external view returns (address[] memory) {
         return members;
     }
