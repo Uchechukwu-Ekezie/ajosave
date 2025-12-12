@@ -369,6 +369,14 @@ contract BaseSafeTarget is Ownable(msg.sender) {
     }
 }
 
+/**
+ * @title BaseSafeFlexible
+ * @author AjoSave
+ * @notice Implements a flexible savings pool where members can deposit and withdraw at any time
+ * @dev Members maintain individual balances and can deposit/withdraw freely within the pool.
+ *      Supports optional yield distribution and withdrawal fees. This contract does not use
+ *      ReentrancyGuard but should be reviewed if external calls are added in the future.
+ */
 /* ========== FLEXIBLE POOL ========== */
 contract BaseSafeFlexible is Ownable(msg.sender) {
     address[] public members;
@@ -383,12 +391,34 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
     bool public yieldEnabled;
     IERC20 public immutable token;
 
+    /// @notice Emitted when a member deposits tokens into the pool
     event Deposited(address indexed user, uint256 amount);
+    
+    /// @notice Emitted when a member withdraws tokens from the pool
+    /// @param user The member withdrawing tokens
+    /// @param amount The net amount withdrawn after fees
+    /// @param fee The withdrawal fee deducted
     event Withdrawn(address indexed user, uint256 amount, uint256 fee);
+    
+    /// @notice Emitted when yield is distributed to members based on their balances
     event YieldDistributed(uint256 amount);
 
+    /// @notice Basis points constant (10000 = 100%)
     uint256 private constant BPS = 10000;
 
+    /**
+     * @notice Initializes a new flexible savings pool
+     * @dev Sets up the pool with members, minimum deposit requirements, fee structure, and yield settings.
+     *      The pool becomes active immediately and accepts deposits/withdrawals.
+     * @param _token The ERC20 token address to be used for deposits and withdrawals
+     * @param _members Array of member addresses who can participate in the pool
+     * @param _minimumDeposit Minimum amount required for each deposit (in token units)
+     * @param _withdrawalFeeBps Withdrawal fee in basis points (e.g., 50 = 0.5%)
+     * @param _yieldEnabled Whether yield distribution is enabled for this pool
+     * @param _treasury Address that receives withdrawal fees
+     * @param _treasuryFeeBps Treasury fee in basis points (for yield distribution if applicable)
+     * @custom:security Requires at least 2 members, non-zero minimum deposit, and valid treasury address
+     */
     constructor(
         address _token,
         address[] memory _members,
