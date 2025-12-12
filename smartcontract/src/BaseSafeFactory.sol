@@ -5,6 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+/**
+ * @title BaseSafeRotational
+ * @author AjoSave
+ * @notice Implements a rotational savings pool where members take turns receiving payouts
+ * @dev This contract manages a traditional ROSCA (Rotating Savings and Credit Association)
+ *      where members deposit fixed amounts each round, and one member receives the collected
+ *      funds in rotation. Includes penalty mechanisms for late deposits and automated payout
+ *      scheduling. Protected by ReentrancyGuard to prevent reentrancy attacks.
+ */
 /* ========== ROTATIONAL POOL ========== */
 contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
     address[] public members;
@@ -20,13 +29,38 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
     bool public active;
     IERC20 public immutable token;
 
+    /// @notice Emitted when a member deposits their contribution for the current round
     event Deposit(address indexed user, uint256 amount);
+    
+    /// @notice Emitted when a payout is made to the beneficiary for the current round
+    /// @param beneficiary The member receiving the payout
+    /// @param amount The net payout amount after fees
+    /// @param treasuryCut The fee amount sent to treasury
+    /// @param relayerCut The fee amount sent to the relayer who triggered the payout
     event Payout(address indexed beneficiary, uint256 amount, uint256 treasuryCut, uint256 relayerCut);
+    
+    /// @notice Emitted when a penalty is applied to a member who failed to deposit on time
     event Slashed(address indexed offender, uint256 penalty);
+    
+    /// @notice Emitted when all rounds are completed and the pool becomes inactive
     event PoolCompleted();
 
+    /// @notice Basis points constant (10000 = 100%)
     uint256 private constant BPS = 10000;
 
+    /**
+     * @notice Initializes a new rotational savings pool
+     * @dev Sets up the pool with members, deposit requirements, and fee structure.
+     *      The pool becomes active immediately and the first round starts.
+     * @param _token The ERC20 token address to be used for deposits and payouts
+     * @param _members Array of member addresses who can participate in the pool
+     * @param _depositAmount Fixed amount each member must deposit per round (in token units)
+     * @param _roundDuration Duration of each round in seconds (time between payouts)
+     * @param _treasuryFeeBps Treasury fee in basis points (e.g., 100 = 1%)
+     * @param _relayerFeeBps Relayer fee in basis points for triggering payouts
+     * @param _treasury Address that receives treasury fees
+     * @custom:security Requires at least 2 members, non-zero amounts, and valid addresses
+     */
     constructor(
         address _token,
         address[] memory _members,
@@ -56,6 +90,13 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         active = true;
     }
 
+    /**
+     * @notice Allows a member to deposit their contribution for the current round
+     * @dev Member must approve the contract to spend tokens before calling this function.
+     *      Each member can only deposit once per round. Protected by ReentrancyGuard.
+     * @custom:security Requires pool to be active, caller to be a member, and not already deposited
+     * @custom:security Uses nonReentrant modifier to prevent reentrancy attacks
+     */
     function deposit() external nonReentrant {
         require(active, "pool inactive");
         require(isMember(msg.sender), "not member");
@@ -68,6 +109,16 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         emit Deposit(msg.sender, depositAmount);
     }
 
+    /**
+     * @notice Triggers the payout for the current round to the designated beneficiary
+     * @dev This function can be called by anyone once the round duration has elapsed.
+     *      It handles penalty collection for non-depositing members, calculates fees,
+     *      distributes the payout to the beneficiary, and advances to the next round.
+     *      The caller receives the relayer fee as an incentive to trigger payouts.
+     * @custom:security Protected by ReentrancyGuard. Penalties are collected via try-catch
+     *                  to handle cases where members don't have sufficient token allowance.
+     * @custom:security Relayer fee is paid to msg.sender - verify caller identity in production
+     */
     function triggerPayout() external nonReentrant {
         require(active, "pool inactive");
         require(block.timestamp >= nextPayoutTime, "too early");
@@ -136,6 +187,11 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         }
     }
 
+    /**
+     * @notice Checks if an address is a member of this rotational pool
+     * @param who The address to check for membership
+     * @return bool True if the address is a member, false otherwise
+     */
     function isMember(address who) public view returns (bool) {
         for (uint256 i = 0; i < totalMembers; i++) {
             if (members[i] == who) return true;
@@ -143,11 +199,24 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         return false;
     }
 
+    /**
+     * @notice Returns the complete list of member addresses in this rotational pool
+     * @return Array of all member addresses in the pool
+     */
     function membersList() external view returns (address[] memory) {
         return members;
     }
 }
 
+/**
+ * @title BaseSafeTarget
+ * @author AjoSave
+ * @notice Implements a target-based savings pool where members contribute towards a collective goal
+ * @dev Members can contribute any amount until the target is reached or deadline passes.
+ *      Once the target is met or deadline expires, members can withdraw their proportional share
+ *      minus treasury fees. This contract does not use ReentrancyGuard but should be reviewed
+ *      if external calls are added in the future.
+ */
 /* ========== TARGET POOL ========== */
 contract BaseSafeTarget is Ownable(msg.sender) {
     address[] public members;
@@ -162,12 +231,30 @@ contract BaseSafeTarget is Ownable(msg.sender) {
     uint256 public treasuryFeeBps;
     IERC20 public immutable token;
 
+    /// @notice Emitted when a member contributes to the pool
     event Contributed(address indexed user, uint256 amount);
+    
+    /// @notice Emitted when the target amount is reached
     event TargetReached();
+    
+    /// @notice Emitted when a member withdraws their share
     event Withdrawal(address indexed user, uint256 amount);
 
+    /// @notice Basis points constant (10000 = 100%)
     uint256 private constant BPS = 10000;
 
+    /**
+     * @notice Initializes a new target-based savings pool
+     * @dev Sets up the pool with members, target amount, deadline, and fee structure.
+     *      The pool becomes active immediately and accepts contributions until target or deadline.
+     * @param _token The ERC20 token address to be used for contributions and withdrawals
+     * @param _members Array of member addresses who can contribute to the pool
+     * @param _targetAmount The total amount the pool aims to collect (in token units)
+     * @param _deadline Unix timestamp after which contributions are no longer accepted
+     * @param _treasuryFeeBps Treasury fee in basis points (e.g., 100 = 1%)
+     * @param _treasury Address that receives treasury fees
+     * @custom:security Requires at least 2 members, non-zero target, future deadline, and valid addresses
+     */
     constructor(
         address _token,
         address[] memory _members,
@@ -192,6 +279,14 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         active = true;
     }
 
+    /**
+     * @notice Allows a member to contribute tokens to the pool
+     * @dev Member must approve the contract to spend tokens before calling this function.
+     *      Contributions are tracked per member and added to the total. If the target is reached,
+     *      the pool is marked as completed. Protected by nonReentrant modifier.
+     * @param amount The amount of tokens to contribute (must be greater than 0)
+     * @custom:security Requires pool to be active, caller to be a member, deadline not passed, and positive amount
+     */
     function contribute(uint256 amount) external nonReentrant {
         require(active, "pool inactive");
         require(isMember(msg.sender), "not member");
@@ -212,6 +307,13 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         }
     }
 
+    /**
+     * @notice Allows a member to withdraw their proportional share from the pool
+     * @dev Can only be called after target is reached or deadline has passed.
+     *      Withdrawal amount is calculated based on the member's contribution share
+     *      minus proportional treasury fees. Protected by nonReentrant modifier.
+     * @custom:security Requires pool to be completed or deadline passed, and member to have contributed
+     */
     function withdraw() external nonReentrant {
         require(completed || block.timestamp > deadline, "not ready");
         require(contributions[msg.sender] > 0, "no contribution");
@@ -229,6 +331,13 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         emit Withdrawal(msg.sender, userShare);
     }
 
+    /**
+     * @notice Allows the owner to withdraw accumulated treasury fees
+     * @dev Can only be called after target is reached or deadline has passed.
+     *      Calculates total fees based on total contributions and transfers to treasury.
+     *      Protected by onlyOwner and nonReentrant modifiers.
+     * @custom:security Only callable by contract owner. Requires pool to be completed or deadline passed
+     */
     function treasuryWithdraw() external onlyOwner nonReentrant {
         require(completed || block.timestamp > deadline, "not ready");
 
@@ -239,6 +348,11 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         require(ok, "transfer failed");
     }
 
+    /**
+     * @notice Checks if an address is a member of this target pool
+     * @param who The address to check for membership
+     * @return bool True if the address is a member, false otherwise
+     */
     function isMember(address who) public view returns (bool) {
         for (uint256 i = 0; i < totalMembers; i++) {
             if (members[i] == who) return true;
@@ -246,11 +360,23 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         return false;
     }
 
+    /**
+     * @notice Returns the complete list of member addresses in this target pool
+     * @return Array of all member addresses in the pool
+     */
     function membersList() external view returns (address[] memory) {
         return members;
     }
 }
 
+/**
+ * @title BaseSafeFlexible
+ * @author AjoSave
+ * @notice Implements a flexible savings pool where members can deposit and withdraw at any time
+ * @dev Members maintain individual balances and can deposit/withdraw freely within the pool.
+ *      Supports optional yield distribution and withdrawal fees. This contract does not use
+ *      ReentrancyGuard but should be reviewed if external calls are added in the future.
+ */
 /* ========== FLEXIBLE POOL ========== */
 contract BaseSafeFlexible is Ownable(msg.sender) {
     address[] public members;
@@ -265,12 +391,34 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
     bool public yieldEnabled;
     IERC20 public immutable token;
 
+    /// @notice Emitted when a member deposits tokens into the pool
     event Deposited(address indexed user, uint256 amount);
+    
+    /// @notice Emitted when a member withdraws tokens from the pool
+    /// @param user The member withdrawing tokens
+    /// @param amount The net amount withdrawn after fees
+    /// @param fee The withdrawal fee deducted
     event Withdrawn(address indexed user, uint256 amount, uint256 fee);
+    
+    /// @notice Emitted when yield is distributed to members based on their balances
     event YieldDistributed(uint256 amount);
 
+    /// @notice Basis points constant (10000 = 100%)
     uint256 private constant BPS = 10000;
 
+    /**
+     * @notice Initializes a new flexible savings pool
+     * @dev Sets up the pool with members, minimum deposit requirements, fee structure, and yield settings.
+     *      The pool becomes active immediately and accepts deposits/withdrawals.
+     * @param _token The ERC20 token address to be used for deposits and withdrawals
+     * @param _members Array of member addresses who can participate in the pool
+     * @param _minimumDeposit Minimum amount required for each deposit (in token units)
+     * @param _withdrawalFeeBps Withdrawal fee in basis points (e.g., 50 = 0.5%)
+     * @param _yieldEnabled Whether yield distribution is enabled for this pool
+     * @param _treasury Address that receives withdrawal fees
+     * @param _treasuryFeeBps Treasury fee in basis points (for yield distribution if applicable)
+     * @custom:security Requires at least 2 members, non-zero minimum deposit, and valid treasury address
+     */
     constructor(
         address _token,
         address[] memory _members,
@@ -296,6 +444,13 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         active = true;
     }
 
+    /**
+     * @notice Allows a member to deposit tokens into the flexible pool
+     * @dev Member must approve the contract to spend tokens before calling this function.
+     *      Deposits must meet the minimum deposit requirement. Protected by nonReentrant modifier.
+     * @param amount The amount of tokens to deposit (must be >= minimumDeposit)
+     * @custom:security Requires pool to be active, caller to be a member, and amount >= minimum deposit
+     */
     function deposit(uint256 amount) external nonReentrant {
         require(active, "pool inactive");
         require(isMember(msg.sender), "not member");
@@ -310,6 +465,13 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         emit Deposited(msg.sender, amount);
     }
 
+    /**
+     * @notice Allows a member to withdraw tokens from their balance in the pool
+     * @dev Withdrawal fee is deducted and sent to treasury. The net amount is transferred to the member.
+     *      Protected by nonReentrant modifier.
+     * @param amount The amount of tokens to withdraw (must be <= member's balance)
+     * @custom:security Requires positive amount and sufficient balance. Withdrawal fee is deducted automatically
+     */
     function withdraw(uint256 amount) external nonReentrant {
         require(amount > 0, "amount 0");
         require(balances[msg.sender] >= amount, "insufficient balance");
@@ -331,6 +493,14 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         emit Withdrawn(msg.sender, netAmount, fee);
     }
 
+    /**
+     * @notice Distributes yield earnings to members proportionally based on their balances
+     * @dev Only callable by the owner. Yield is distributed proportionally to each member's
+     *      balance relative to the total pool balance. Protected by onlyOwner and nonReentrant modifiers.
+     * @param yieldAmount The total amount of yield to distribute (must be approved to contract)
+     * @custom:security Only callable by contract owner. Requires yield to be enabled, positive amount, and pool balance
+     * @custom:security Ensure yield tokens are transferred to contract before calling this function
+     */
     function distributeYield(uint256 yieldAmount) external onlyOwner nonReentrant {
         require(yieldEnabled, "yield disabled");
         require(yieldAmount > 0, "yield 0");
@@ -347,6 +517,11 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         emit YieldDistributed(yieldAmount);
     }
 
+    /**
+     * @notice Checks if an address is a member of this flexible pool
+     * @param who The address to check for membership
+     * @return bool True if the address is a member, false otherwise
+     */
     function isMember(address who) public view returns (bool) {
         for (uint256 i = 0; i < totalMembers; i++) {
             if (members[i] == who) return true;
@@ -354,15 +529,32 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         return false;
     }
 
+    /**
+     * @notice Returns the complete list of member addresses in this flexible pool
+     * @return Array of all member addresses in the pool
+     */
     function membersList() external view returns (address[] memory) {
         return members;
     }
 
+    /**
+     * @notice Returns the current balance of a specific member in the pool
+     * @param user The address of the member to query
+     * @return The member's current balance in the pool
+     */
     function getBalance(address user) external view returns (uint256) {
         return balances[user];
     }
 }
 
+/**
+ * @title BaseSafeFactory
+ * @author AjoSave
+ * @notice Factory contract for creating and managing different types of savings pools
+ * @dev This factory creates instances of BaseSafeRotational, BaseSafeTarget, and BaseSafeFlexible pools.
+ *      Maintains lists of all created pools and allows the owner to update the treasury address.
+ *      All created pools use the same token and treasury address configured in the factory.
+ */
 /* ========== FACTORY ========== */
 contract BaseSafeFactory {
     address public immutable token;
@@ -372,10 +564,23 @@ contract BaseSafeFactory {
     address[] public allFlexible;
     address public owner;
 
+    /// @notice Emitted when a new rotational pool is created
     event RotationalCreated(address indexed pool, address indexed creator);
+    
+    /// @notice Emitted when a new target pool is created
     event TargetCreated(address indexed pool, address indexed creator);
+    
+    /// @notice Emitted when a new flexible pool is created
     event FlexibleCreated(address indexed pool, address indexed creator);
 
+    /**
+     * @notice Initializes the factory with the token and treasury addresses
+     * @dev The deployer becomes the owner and can update the treasury address.
+     *      All pools created by this factory will use the specified token and treasury.
+     * @param _token The ERC20 token address to be used by all created pools
+     * @param _treasury The treasury address that will receive fees from all pools
+     * @custom:security Requires non-zero token and treasury addresses
+     */
     constructor(address _token, address _treasury) {
         require(_token != address(0), "token 0");
         require(_treasury != address(0), "treasury 0");
@@ -384,11 +589,27 @@ contract BaseSafeFactory {
         owner = msg.sender;
     }
 
+    /**
+     * @notice Restricts function access to the factory owner only
+     * @dev Reverts if called by any address other than the owner
+     */
     modifier onlyOwner() {
         require(msg.sender == owner, "only owner");
         _;
     }
 
+    /**
+     * @notice Creates a new rotational savings pool
+     * @dev Deploys a new BaseSafeRotational contract with the specified parameters.
+     *      Ownership of the pool is transferred to the caller. The pool is added to the
+     *      allRotational array for tracking.
+     * @param members Array of member addresses who can participate in the pool
+     * @param depositAmount Fixed amount each member must deposit per round
+     * @param roundDuration Duration of each round in seconds
+     * @param treasuryFeeBps Treasury fee in basis points
+     * @param relayerFeeBps Relayer fee in basis points for triggering payouts
+     * @return The address of the newly created rotational pool
+     */
     function createRotational(
         address[] calldata members,
         uint256 depositAmount,
@@ -405,6 +626,17 @@ contract BaseSafeFactory {
         return address(pool);
     }
 
+    /**
+     * @notice Creates a new target-based savings pool
+     * @dev Deploys a new BaseSafeTarget contract with the specified parameters.
+     *      Ownership of the pool is transferred to the caller. The pool is added to the
+     *      allTarget array for tracking.
+     * @param members Array of member addresses who can contribute to the pool
+     * @param targetAmount The total amount the pool aims to collect
+     * @param deadline Unix timestamp after which contributions are no longer accepted
+     * @param treasuryFeeBps Treasury fee in basis points
+     * @return The address of the newly created target pool
+     */
     function createTarget(address[] calldata members, uint256 targetAmount, uint256 deadline, uint256 treasuryFeeBps)
         external
         returns (address)
@@ -416,6 +648,18 @@ contract BaseSafeFactory {
         return address(pool);
     }
 
+    /**
+     * @notice Creates a new flexible savings pool
+     * @dev Deploys a new BaseSafeFlexible contract with the specified parameters.
+     *      Ownership of the pool is transferred to the caller. The pool is added to the
+     *      allFlexible array for tracking.
+     * @param members Array of member addresses who can participate in the pool
+     * @param minimumDeposit Minimum amount required for each deposit
+     * @param withdrawalFeeBps Withdrawal fee in basis points
+     * @param yieldEnabled Whether yield distribution is enabled for this pool
+     * @param treasuryFeeBps Treasury fee in basis points (for yield distribution if applicable)
+     * @return The address of the newly created flexible pool
+     */
     function createFlexible(
         address[] calldata members,
         uint256 minimumDeposit,
@@ -432,6 +676,14 @@ contract BaseSafeFactory {
         return address(pool);
     }
 
+    /**
+     * @notice Updates the treasury address for all future pool creations
+     * @dev Only callable by the factory owner. This does not affect existing pools,
+     *      only pools created after this update will use the new treasury address.
+     * @param _treasury The new treasury address (must not be zero address)
+     * @custom:security Only callable by owner. Verify the new treasury address before calling.
+     *                  Consider using a multisig wallet for enhanced security.
+     */
     function setTreasury(address _treasury) external onlyOwner {
         require(_treasury != address(0), "treasury 0");
         treasury = _treasury;
