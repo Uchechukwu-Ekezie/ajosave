@@ -444,6 +444,13 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         active = true;
     }
 
+    /**
+     * @notice Allows a member to deposit tokens into the flexible pool
+     * @dev Member must approve the contract to spend tokens before calling this function.
+     *      Deposits must meet the minimum deposit requirement. Protected by nonReentrant modifier.
+     * @param amount The amount of tokens to deposit (must be >= minimumDeposit)
+     * @custom:security Requires pool to be active, caller to be a member, and amount >= minimum deposit
+     */
     function deposit(uint256 amount) external nonReentrant {
         require(active, "pool inactive");
         require(isMember(msg.sender), "not member");
@@ -458,6 +465,13 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         emit Deposited(msg.sender, amount);
     }
 
+    /**
+     * @notice Allows a member to withdraw tokens from their balance in the pool
+     * @dev Withdrawal fee is deducted and sent to treasury. The net amount is transferred to the member.
+     *      Protected by nonReentrant modifier.
+     * @param amount The amount of tokens to withdraw (must be <= member's balance)
+     * @custom:security Requires positive amount and sufficient balance. Withdrawal fee is deducted automatically
+     */
     function withdraw(uint256 amount) external nonReentrant {
         require(amount > 0, "amount 0");
         require(balances[msg.sender] >= amount, "insufficient balance");
@@ -479,6 +493,14 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         emit Withdrawn(msg.sender, netAmount, fee);
     }
 
+    /**
+     * @notice Distributes yield earnings to members proportionally based on their balances
+     * @dev Only callable by the owner. Yield is distributed proportionally to each member's
+     *      balance relative to the total pool balance. Protected by onlyOwner and nonReentrant modifiers.
+     * @param yieldAmount The total amount of yield to distribute (must be approved to contract)
+     * @custom:security Only callable by contract owner. Requires yield to be enabled, positive amount, and pool balance
+     * @custom:security Ensure yield tokens are transferred to contract before calling this function
+     */
     function distributeYield(uint256 yieldAmount) external onlyOwner nonReentrant {
         require(yieldEnabled, "yield disabled");
         require(yieldAmount > 0, "yield 0");
