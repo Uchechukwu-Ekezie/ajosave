@@ -160,17 +160,14 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         address beneficiary = members[currentRound];
 
         if (treasuryCut > 0) {
-            bool tOk = token.transfer(treasury, treasuryCut);
-            require(tOk, "treasury transfer failed");
+            token.safeTransfer(treasury, treasuryCut);
         }
 
         if (relayerCut > 0) {
-            bool rOk = token.transfer(msg.sender, relayerCut);
-            require(rOk, "relayer transfer failed");
+            token.safeTransfer(msg.sender, relayerCut);
         }
 
-        bool pOk = token.transfer(beneficiary, payoutAmount);
-        require(pOk, "payout failed");
+        token.safeTransfer(beneficiary, payoutAmount);
 
         emit Payout(beneficiary, payoutAmount, treasuryCut, relayerCut);
 
