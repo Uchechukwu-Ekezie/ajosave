@@ -135,14 +135,12 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
             for (uint256 i = 0; i < totalMembers; i++) {
                 address candidate = members[i];
                 if (!hasDeposited[candidate]) {
-                    try IERC20(token).transferFrom(candidate, address(this), penalty) returns (bool success) {
-                        if (success) {
-                            uint256 toTreasury = penalty / 2;
-                            if (toTreasury > 0) {
-                                IERC20(token).transfer(treasury, toTreasury);
-                            }
-                            emit Slashed(candidate, penalty);
+                    try token.safeTransferFrom(candidate, address(this), penalty) {
+                        uint256 toTreasury = penalty / 2;
+                        if (toTreasury > 0) {
+                            token.safeTransfer(treasury, toTreasury);
                         }
+                        emit Slashed(candidate, penalty);
                     } catch {}
                 }
             }
