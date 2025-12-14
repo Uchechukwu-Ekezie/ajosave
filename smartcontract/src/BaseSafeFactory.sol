@@ -2,8 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title BaseSafeRotational
@@ -12,10 +13,13 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * @dev This contract manages a traditional ROSCA (Rotating Savings and Credit Association)
  *      where members deposit fixed amounts each round, and one member receives the collected
  *      funds in rotation. Includes penalty mechanisms for late deposits and automated payout
- *      scheduling. Protected by ReentrancyGuard to prevent reentrancy attacks.
+ *      scheduling. Protected by ReentrancyGuard to prevent reentrancy attacks. Uses SafeERC20
+ *      for secure token transfers with non-standard ERC20 tokens like USDT.
  */
 /* ========== ROTATIONAL POOL ========== */
 contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     address[] public members;
     mapping(address => bool) public hasDeposited;
     uint256 public totalMembers;
@@ -102,8 +106,7 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         require(isMember(msg.sender), "not member");
         require(!hasDeposited[msg.sender], "already deposited");
 
-        bool ok = token.transferFrom(msg.sender, address(this), depositAmount);
-        require(ok, "transferFrom failed");
+        token.safeTransferFrom(msg.sender, address(this), depositAmount);
 
         hasDeposited[msg.sender] = true;
         emit Deposit(msg.sender, depositAmount);
@@ -137,7 +140,7 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
                         if (success) {
                             uint256 toTreasury = penalty / 2;
                             if (toTreasury > 0) {
-                                IERC20(token).transfer(treasury, toTreasury);
+                                token.safeTransfer(treasury, toTreasury);
                             }
                             emit Slashed(candidate, penalty);
                         }
@@ -160,17 +163,14 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         address beneficiary = members[currentRound];
 
         if (treasuryCut > 0) {
-            bool tOk = token.transfer(treasury, treasuryCut);
-            require(tOk, "treasury transfer failed");
+            token.safeTransfer(treasury, treasuryCut);
         }
 
         if (relayerCut > 0) {
-            bool rOk = token.transfer(msg.sender, relayerCut);
-            require(rOk, "relayer transfer failed");
+            token.safeTransfer(msg.sender, relayerCut);
         }
 
-        bool pOk = token.transfer(beneficiary, payoutAmount);
-        require(pOk, "payout failed");
+        token.safeTransfer(beneficiary, payoutAmount);
 
         emit Payout(beneficiary, payoutAmount, treasuryCut, relayerCut);
 
@@ -214,11 +214,13 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
  * @notice Implements a target-based savings pool where members contribute towards a collective goal
  * @dev Members can contribute any amount until the target is reached or deadline passes.
  *      Once the target is met or deadline expires, members can withdraw their proportional share
- *      minus treasury fees. This contract does not use ReentrancyGuard but should be reviewed
- *      if external calls are added in the future.
+ *      minus treasury fees. Protected by ReentrancyGuard to prevent reentrancy attacks.
+ *      Uses SafeERC20 for secure token transfers with non-standard ERC20 tokens.
  */
 /* ========== TARGET POOL ========== */
-contract BaseSafeTarget is Ownable(msg.sender) {
+contract BaseSafeTarget is Ownable(msg.sender), ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     address[] public members;
     mapping(address => uint256) public contributions;
     uint256 public totalMembers;
@@ -293,8 +295,7 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         require(block.timestamp <= deadline, "deadline passed");
         require(amount > 0, "amount 0");
 
-        bool ok = token.transferFrom(msg.sender, address(this), amount);
-        require(ok, "transferFrom failed");
+        token.safeTransferFrom(msg.sender, address(this), amount);
 
         contributions[msg.sender] += amount;
         totalContributed += amount;
@@ -325,8 +326,7 @@ contract BaseSafeTarget is Ownable(msg.sender) {
 
         contributions[msg.sender] = 0;
 
-        bool ok = token.transfer(msg.sender, userShare);
-        require(ok, "transfer failed");
+        token.safeTransfer(msg.sender, userShare);
 
         emit Withdrawal(msg.sender, userShare);
     }
@@ -344,8 +344,7 @@ contract BaseSafeTarget is Ownable(msg.sender) {
         uint256 totalFees = (totalContributed * treasuryFeeBps) / BPS;
         require(totalFees > 0, "no fees");
 
-        bool ok = token.transfer(treasury, totalFees);
-        require(ok, "transfer failed");
+        token.safeTransfer(treasury, totalFees);
     }
 
     /**
@@ -374,11 +373,14 @@ contract BaseSafeTarget is Ownable(msg.sender) {
  * @author AjoSave
  * @notice Implements a flexible savings pool where members can deposit and withdraw at any time
  * @dev Members maintain individual balances and can deposit/withdraw freely within the pool.
- *      Supports optional yield distribution and withdrawal fees. This contract does not use
- *      ReentrancyGuard but should be reviewed if external calls are added in the future.
+ *      Supports optional yield distribution and withdrawal fees. Protected by ReentrancyGuard
+ *      to prevent reentrancy attacks. Uses SafeERC20 for secure token transfers with non-standard
+ *      ERC20 tokens.
  */
 /* ========== FLEXIBLE POOL ========== */
-contract BaseSafeFlexible is Ownable(msg.sender) {
+contract BaseSafeFlexible is Ownable(msg.sender), ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     address[] public members;
     mapping(address => uint256) public balances;
     uint256 public totalMembers;
@@ -456,8 +458,7 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         require(isMember(msg.sender), "not member");
         require(amount >= minimumDeposit, "below minimum");
 
-        bool ok = token.transferFrom(msg.sender, address(this), amount);
-        require(ok, "transferFrom failed");
+        token.safeTransferFrom(msg.sender, address(this), amount);
 
         balances[msg.sender] += amount;
         totalBalance += amount;
@@ -483,12 +484,10 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         totalBalance -= amount;
 
         if (fee > 0) {
-            bool feeOk = token.transfer(treasury, fee);
-            require(feeOk, "fee transfer failed");
+            token.safeTransfer(treasury, fee);
         }
 
-        bool ok = token.transfer(msg.sender, netAmount);
-        require(ok, "withdraw transfer failed");
+        token.safeTransfer(msg.sender, netAmount);
 
         emit Withdrawn(msg.sender, netAmount, fee);
     }
@@ -559,9 +558,9 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
 contract BaseSafeFactory {
     address public immutable token;
     address public treasury;
-    address[] public allRotational;
-    address[] public allTarget;
-    address[] public allFlexible;
+    address[] private _allRotational;
+    address[] private _allTarget;
+    address[] private _allFlexible;
     address public owner;
 
     /// @notice Emitted when a new rotational pool is created
@@ -621,7 +620,7 @@ contract BaseSafeFactory {
             token, members, depositAmount, roundDuration, treasuryFeeBps, relayerFeeBps, treasury
         );
         pool.transferOwnership(msg.sender);
-        allRotational.push(address(pool));
+        _allRotational.push(address(pool));
         emit RotationalCreated(address(pool), msg.sender);
         return address(pool);
     }
@@ -643,7 +642,7 @@ contract BaseSafeFactory {
     {
         BaseSafeTarget pool = new BaseSafeTarget(token, members, targetAmount, deadline, treasuryFeeBps, treasury);
         pool.transferOwnership(msg.sender);
-        allTarget.push(address(pool));
+        _allTarget.push(address(pool));
         emit TargetCreated(address(pool), msg.sender);
         return address(pool);
     }
@@ -671,7 +670,7 @@ contract BaseSafeFactory {
             token, members, minimumDeposit, withdrawalFeeBps, yieldEnabled, treasury, treasuryFeeBps
         );
         pool.transferOwnership(msg.sender);
-        allFlexible.push(address(pool));
+        _allFlexible.push(address(pool));
         emit FlexibleCreated(address(pool), msg.sender);
         return address(pool);
     }
@@ -687,5 +686,29 @@ contract BaseSafeFactory {
     function setTreasury(address _treasury) external onlyOwner {
         require(_treasury != address(0), "treasury 0");
         treasury = _treasury;
+    }
+
+    /**
+     * @notice Returns the complete list of all rotational pools created by this factory
+     * @return Array of all rotational pool addresses
+     */
+    function allRotational() external view returns (address[] memory) {
+        return _allRotational;
+    }
+
+    /**
+     * @notice Returns the complete list of all target pools created by this factory
+     * @return Array of all target pool addresses
+     */
+    function allTarget() external view returns (address[] memory) {
+        return _allTarget;
+    }
+
+    /**
+     * @notice Returns the complete list of all flexible pools created by this factory
+     * @return Array of all flexible pool addresses
+     */
+    function allFlexible() external view returns (address[] memory) {
+        return _allFlexible;
     }
 }
