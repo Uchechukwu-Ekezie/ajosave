@@ -13,7 +13,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * @dev This contract manages a traditional ROSCA (Rotating Savings and Credit Association)
  *      where members deposit fixed amounts each round, and one member receives the collected
  *      funds in rotation. Includes penalty mechanisms for late deposits and automated payout
- *      scheduling. Protected by ReentrancyGuard to prevent reentrancy attacks.
+ *      scheduling. Protected by ReentrancyGuard to prevent reentrancy attacks. Uses SafeERC20
+ *      for secure token transfers with non-standard ERC20 tokens like USDT.
  */
 /* ========== ROTATIONAL POOL ========== */
 contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
@@ -211,8 +212,8 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
  * @notice Implements a target-based savings pool where members contribute towards a collective goal
  * @dev Members can contribute any amount until the target is reached or deadline passes.
  *      Once the target is met or deadline expires, members can withdraw their proportional share
- *      minus treasury fees. This contract does not use ReentrancyGuard but should be reviewed
- *      if external calls are added in the future.
+ *      minus treasury fees. Protected by ReentrancyGuard to prevent reentrancy attacks.
+ *      Uses SafeERC20 for secure token transfers with non-standard ERC20 tokens.
  */
 /* ========== TARGET POOL ========== */
 contract BaseSafeTarget is Ownable(msg.sender), ReentrancyGuard {
@@ -370,8 +371,9 @@ contract BaseSafeTarget is Ownable(msg.sender), ReentrancyGuard {
  * @author AjoSave
  * @notice Implements a flexible savings pool where members can deposit and withdraw at any time
  * @dev Members maintain individual balances and can deposit/withdraw freely within the pool.
- *      Supports optional yield distribution and withdrawal fees. This contract does not use
- *      ReentrancyGuard but should be reviewed if external calls are added in the future.
+ *      Supports optional yield distribution and withdrawal fees. Protected by ReentrancyGuard
+ *      to prevent reentrancy attacks. Uses SafeERC20 for secure token transfers with non-standard
+ *      ERC20 tokens.
  */
 /* ========== FLEXIBLE POOL ========== */
 contract BaseSafeFlexible is Ownable(msg.sender), ReentrancyGuard {
