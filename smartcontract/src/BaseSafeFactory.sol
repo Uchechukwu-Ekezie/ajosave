@@ -558,9 +558,9 @@ contract BaseSafeFlexible is Ownable(msg.sender), ReentrancyGuard {
 contract BaseSafeFactory {
     address public immutable token;
     address public treasury;
-    address[] public allRotational;
-    address[] public allTarget;
-    address[] public allFlexible;
+    address[] private _allRotational;
+    address[] private _allTarget;
+    address[] private _allFlexible;
     address public owner;
 
     /// @notice Emitted when a new rotational pool is created
@@ -620,7 +620,7 @@ contract BaseSafeFactory {
             token, members, depositAmount, roundDuration, treasuryFeeBps, relayerFeeBps, treasury
         );
         pool.transferOwnership(msg.sender);
-        allRotational.push(address(pool));
+        _allRotational.push(address(pool));
         emit RotationalCreated(address(pool), msg.sender);
         return address(pool);
     }
@@ -642,7 +642,7 @@ contract BaseSafeFactory {
     {
         BaseSafeTarget pool = new BaseSafeTarget(token, members, targetAmount, deadline, treasuryFeeBps, treasury);
         pool.transferOwnership(msg.sender);
-        allTarget.push(address(pool));
+        _allTarget.push(address(pool));
         emit TargetCreated(address(pool), msg.sender);
         return address(pool);
     }
@@ -670,7 +670,7 @@ contract BaseSafeFactory {
             token, members, minimumDeposit, withdrawalFeeBps, yieldEnabled, treasury, treasuryFeeBps
         );
         pool.transferOwnership(msg.sender);
-        allFlexible.push(address(pool));
+        _allFlexible.push(address(pool));
         emit FlexibleCreated(address(pool), msg.sender);
         return address(pool);
     }
@@ -686,5 +686,29 @@ contract BaseSafeFactory {
     function setTreasury(address _treasury) external onlyOwner {
         require(_treasury != address(0), "treasury 0");
         treasury = _treasury;
+    }
+
+    /**
+     * @notice Returns the complete list of all rotational pools created by this factory
+     * @return Array of all rotational pool addresses
+     */
+    function allRotational() external view returns (address[] memory) {
+        return _allRotational;
+    }
+
+    /**
+     * @notice Returns the complete list of all target pools created by this factory
+     * @return Array of all target pool addresses
+     */
+    function allTarget() external view returns (address[] memory) {
+        return _allTarget;
+    }
+
+    /**
+     * @notice Returns the complete list of all flexible pools created by this factory
+     * @return Array of all flexible pool addresses
+     */
+    function allFlexible() external view returns (address[] memory) {
+        return _allFlexible;
     }
 }
