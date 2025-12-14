@@ -323,8 +323,7 @@ contract BaseSafeTarget is Ownable(msg.sender), ReentrancyGuard {
 
         contributions[msg.sender] = 0;
 
-        bool ok = token.transfer(msg.sender, userShare);
-        require(ok, "transfer failed");
+        token.safeTransfer(msg.sender, userShare);
 
         emit Withdrawal(msg.sender, userShare);
     }
@@ -342,8 +341,7 @@ contract BaseSafeTarget is Ownable(msg.sender), ReentrancyGuard {
         uint256 totalFees = (totalContributed * treasuryFeeBps) / BPS;
         require(totalFees > 0, "no fees");
 
-        bool ok = token.transfer(treasury, totalFees);
-        require(ok, "transfer failed");
+        token.safeTransfer(treasury, totalFees);
     }
 
     /**
