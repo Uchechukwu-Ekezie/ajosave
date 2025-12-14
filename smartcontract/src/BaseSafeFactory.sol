@@ -374,7 +374,9 @@ contract BaseSafeTarget is Ownable(msg.sender), ReentrancyGuard {
  *      ReentrancyGuard but should be reviewed if external calls are added in the future.
  */
 /* ========== FLEXIBLE POOL ========== */
-contract BaseSafeFlexible is Ownable(msg.sender) {
+contract BaseSafeFlexible is Ownable(msg.sender), ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     address[] public members;
     mapping(address => uint256) public balances;
     uint256 public totalMembers;
@@ -452,8 +454,7 @@ contract BaseSafeFlexible is Ownable(msg.sender) {
         require(isMember(msg.sender), "not member");
         require(amount >= minimumDeposit, "below minimum");
 
-        bool ok = token.transferFrom(msg.sender, address(this), amount);
-        require(ok, "transferFrom failed");
+        token.safeTransferFrom(msg.sender, address(this), amount);
 
         balances[msg.sender] += amount;
         totalBalance += amount;
