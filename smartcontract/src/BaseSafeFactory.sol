@@ -105,8 +105,7 @@ contract BaseSafeRotational is Ownable(msg.sender), ReentrancyGuard {
         require(isMember(msg.sender), "not member");
         require(!hasDeposited[msg.sender], "already deposited");
 
-        bool ok = token.transferFrom(msg.sender, address(this), depositAmount);
-        require(ok, "transferFrom failed");
+        token.safeTransferFrom(msg.sender, address(this), depositAmount);
 
         hasDeposited[msg.sender] = true;
         emit Deposit(msg.sender, depositAmount);
