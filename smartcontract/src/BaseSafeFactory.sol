@@ -480,12 +480,10 @@ contract BaseSafeFlexible is Ownable(msg.sender), ReentrancyGuard {
         totalBalance -= amount;
 
         if (fee > 0) {
-            bool feeOk = token.transfer(treasury, fee);
-            require(feeOk, "fee transfer failed");
+            token.safeTransfer(treasury, fee);
         }
 
-        bool ok = token.transfer(msg.sender, netAmount);
-        require(ok, "withdraw transfer failed");
+        token.safeTransfer(msg.sender, netAmount);
 
         emit Withdrawn(msg.sender, netAmount, fee);
     }
